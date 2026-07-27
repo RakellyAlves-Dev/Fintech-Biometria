@@ -172,7 +172,7 @@ app.post('/api/auth-options', async (req, res) => {
     const options = await generateAuthenticationOptions({
       rpID: RP_ID,
       allowCredentials: userPasskeys,
-      userVerification: 'preferred',
+     userVerification: 'preferred'
     });
 
     const { error: updateError } = await supabase
