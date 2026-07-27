@@ -21,10 +21,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const rawRpId = process.env.RP_ID || 'localhost';
 const rawOrigin = process.env.ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
 
-// RP_ID não pode ter protocolo (http/https) nem barra no final
 const RP_ID = rawRpId.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].trim();
-
-// ORIGIN precisa ter o protocolo e NÃO pode ter barra no final
 const ORIGIN = rawOrigin.replace(/\/$/, '').trim();
 
 // ==========================================
@@ -35,7 +32,6 @@ app.post('/api/register-options', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: 'E-mail é obrigatório' });
 
-    // Busca usuário no Supabase
     let { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -44,7 +40,6 @@ app.post('/api/register-options', async (req, res) => {
 
     if (error) throw error;
 
-    // Se o usuário não existir, cria um novo
     if (!user) {
       const { data: newUser, error: createError } = await supabase
         .from('users')
@@ -56,7 +51,6 @@ app.post('/api/register-options', async (req, res) => {
       user = newUser;
     }
 
-    // Gera opções para a API WebAuthn do navegador
     const options = await generateRegistrationOptions({
       rpName: 'SafeFintech Vault',
       rpID: RP_ID,
@@ -64,13 +58,12 @@ app.post('/api/register-options', async (req, res) => {
       userName: user.email,
       attestationType: 'none',
       authenticatorSelection: {
-        authenticatorAttachment: 'platform', // Força o Windows Hello / PIN local
+        authenticatorAttachment: 'platform',
         residentKey: 'preferred',
-        userVerification: 'required',        // Exige a verificação (PIN/Biometria)
+        userVerification: 'preferred',
       },
     });
 
-    // Salva o desafio na tabela 'users'
     const { error: updateError } = await supabase
       .from('users')
       .update({ current_challenge: options.challenge })
@@ -107,6 +100,7 @@ app.post('/api/register-verify', async (req, res) => {
       expectedChallenge: user.current_challenge,
       expectedOrigin: ORIGIN,
       expectedRPID: RP_ID,
+      requireUserVerification: false, // 👈 Evita rejeitar o PIN do Windows
     });
 
     const { verified, registrationInfo } = verification;
@@ -172,7 +166,7 @@ app.post('/api/auth-options', async (req, res) => {
     const options = await generateAuthenticationOptions({
       rpID: RP_ID,
       allowCredentials: userPasskeys,
-     userVerification: 'preferred'
+      userVerification: 'preferred',
     });
 
     const { error: updateError } = await supabase
@@ -215,6 +209,7 @@ app.post('/api/auth-verify', async (req, res) => {
       expectedChallenge: user.current_challenge,
       expectedOrigin: ORIGIN,
       expectedRPID: RP_ID,
+      requireUserVerification: false, // 👈 Permite validar a assinatura do PIN no Windows
       credential: {
         id: dbDevice.credentialID,
         publicKey: Buffer.from(dbDevice.credentialPublicKey, 'base64url'),
