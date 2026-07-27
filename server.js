@@ -17,12 +17,14 @@ app.use(express.json());
 // Servir os arquivos estáticos da pasta public
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Ajuste automático de segurança para RP_ID e ORIGIN
-let rawRpId = process.env.RP_ID || 'localhost';
-let rawOrigin = process.env.ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
+// Trata e limpa as variáveis de ambiente automaticamente
+const rawRpId = process.env.RP_ID || 'localhost';
+const rawOrigin = process.env.ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
 
-// Limpa barras do final e remove protocolos do RP_ID se houver
-const RP_ID = rawRpId.replace(/^https?:\/\//, '').replace(/\/$/, '').trim();
+// RP_ID não pode ter protocolo (http/https) nem barra no final
+const RP_ID = rawRpId.replace(/^https?:\/\//, '').split('/')[0].split(':')[0].trim();
+
+// ORIGIN precisa ter o protocolo e NÃO pode ter barra no final
 const ORIGIN = rawOrigin.replace(/\/$/, '').trim();
 
 // ==========================================
@@ -54,10 +56,11 @@ app.post('/api/register-options', async (req, res) => {
       user = newUser;
     }
 
+    // Gera opções para a API WebAuthn do navegador
     const options = await generateRegistrationOptions({
       rpName: 'SafeFintech Vault',
       rpID: RP_ID,
-      userID: Buffer.from(user.id),
+      userID: new TextEncoder().encode(user.id),
       userName: user.email,
       attestationType: 'none',
       authenticatorSelection: {
@@ -66,7 +69,7 @@ app.post('/api/register-options', async (req, res) => {
       },
     });
 
-    // Atualiza o desafio no Supabase
+    // Salva o desafio na tabela 'users'
     const { error: updateError } = await supabase
       .from('users')
       .update({ current_challenge: options.challenge })
@@ -124,7 +127,6 @@ app.post('/api/register-verify', async (req, res) => {
       const currentDevices = user.devices || [];
       const updatedDevices = [...currentDevices, newDevice];
 
-      // Atualiza o usuário no Supabase com o novo dispositivo e limpa o desafio
       const { error: updateError } = await supabase
         .from('users')
         .update({
@@ -172,7 +174,6 @@ app.post('/api/auth-options', async (req, res) => {
       userVerification: 'preferred',
     });
 
-    // Salva o novo desafio no Supabase
     const { error: updateError } = await supabase
       .from('users')
       .update({ current_challenge: options.challenge })
@@ -221,7 +222,6 @@ app.post('/api/auth-verify', async (req, res) => {
     });
 
     if (verification.verified) {
-      // Atualiza o contador de uso do dispositivo
       const updatedDevices = user.devices.map(dev => {
         if (dev.credentialID === credential.id) {
           return { ...dev, counter: verification.authenticationInfo.newCounter };
