@@ -14,7 +14,9 @@ function showAlert(message, type = 'info') {
 
 // 1. Cadastrar Biometria
 document.getElementById('btnRegister').addEventListener('click', async () => {
-  const email = document.getElementById('username').value;
+  const emailInput = document.getElementById('username');
+  const email = emailInput ? emailInput.value.trim() : '';
+
   if (!email) {
     showAlert('<i class="bi bi-exclamation-circle me-1"></i> Digite o e-mail do diretor.', 'warning');
     return;
@@ -30,11 +32,15 @@ document.getElementById('btnRegister').addEventListener('click', async () => {
     });
 
     const options = await resp.json();
-    if (options.error) throw new Error(options.error);
+
+    if (!resp.ok || options.error) {
+      throw new Error(options.error || `Erro no servidor (Status: ${resp.status})`);
+    }
 
     showAlert('<i class="bi bi-fingerprint me-1"></i> Confirme sua biometria no leitor do dispositivo...', 'warning');
 
-    const credential = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options });
+    // Executa a solicitação biométrica no navegador/celular
+    const credential = await SimpleWebAuthnBrowser.startRegistration(options);
 
     showAlert('<i class="bi bi-shield-check me-1"></i> Salvando chave pública no servidor...', 'info');
 
@@ -46,20 +52,22 @@ document.getElementById('btnRegister').addEventListener('click', async () => {
 
     const verifyResult = await verifyResp.json();
 
-    if (verifyResult.verified) {
+    if (verifyResp.ok && verifyResult.verified) {
       showAlert('<i class="bi bi-check-circle-fill me-1"></i> <strong>Sucesso!</strong> Chave biométrica registrada com segurança.', 'success');
     } else {
-      throw new Error(verifyResult.error || 'Falha ao registrar.');
+      throw new Error(verifyResult.error || 'Falha ao registrar credencial biométrica.');
     }
   } catch (error) {
-    console.error(error);
+    console.error('Erro no registro de biometria:', error);
     showAlert(`<i class="bi bi-x-circle-fill me-1"></i> Erro: ${error.message}`, 'danger');
   }
 });
 
 // 2. Aprovar Transferência
 document.getElementById('btnApprove').addEventListener('click', async () => {
-  const email = document.getElementById('username').value;
+  const emailInput = document.getElementById('username');
+  const email = emailInput ? emailInput.value.trim() : '';
+
   if (!email) {
     showAlert('<i class="bi bi-exclamation-circle me-1"></i> Preencha o e-mail do diretor na aba "1. Credencial" primeiro.', 'warning');
     return;
@@ -75,11 +83,15 @@ document.getElementById('btnApprove').addEventListener('click', async () => {
     });
 
     const options = await resp.json();
-    if (options.error) throw new Error(options.error);
+
+    if (!resp.ok || options.error) {
+      throw new Error(options.error || `Erro no servidor (Status: ${resp.status})`);
+    }
 
     showAlert('<i class="bi bi-fingerprint me-1"></i> Coloque o dedo na biometria para autorizar R$ 2.500.000,00...', 'warning');
 
-    const credential = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: options });
+    // Executa a autenticação biométrica no navegador/celular
+    const credential = await SimpleWebAuthnBrowser.startAuthentication(options);
 
     showAlert('<i class="bi bi-shield-lock me-1"></i> Verificando assinatura biométrica...', 'info');
 
@@ -91,13 +103,13 @@ document.getElementById('btnApprove').addEventListener('click', async () => {
 
     const verifyResult = await verifyResp.json();
 
-    if (verifyResult.verified) {
+    if (verifyResp.ok && verifyResult.verified) {
       showAlert('<i class="bi bi-check-circle-fill me-1"></i> <strong>TRANSFERÊNCIA APROVADA!</strong> R$ 2.500.000,00 transferidos com sucesso.', 'success');
     } else {
       throw new Error(verifyResult.error || 'Assinatura recusada.');
     }
   } catch (error) {
-    console.error(error);
+    console.error('Erro na aprovação da transferência:', error);
     showAlert(`<i class="bi bi-x-circle-fill me-1"></i> Erro ao aprovar: ${error.message}`, 'danger');
   }
 });
