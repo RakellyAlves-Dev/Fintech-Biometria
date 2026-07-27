@@ -17,8 +17,13 @@ app.use(express.json());
 // Servir os arquivos estáticos da pasta public
 app.use(express.static(path.join(__dirname, 'public')));
 
-const RP_ID = process.env.RP_ID || 'localhost';
-const ORIGIN = process.env.ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
+// Ajuste automático de segurança para RP_ID e ORIGIN
+let rawRpId = process.env.RP_ID || 'localhost';
+let rawOrigin = process.env.ORIGIN || `http://localhost:${process.env.PORT || 3000}`;
+
+// Limpa barras do final e remove protocolos do RP_ID se houver
+const RP_ID = rawRpId.replace(/^https?:\/\//, '').replace(/\/$/, '').trim();
+const ORIGIN = rawOrigin.replace(/\/$/, '').trim();
 
 // ==========================================
 // 1. ROTA: Gerar opções para Cadastro Biométrico
@@ -52,7 +57,7 @@ app.post('/api/register-options', async (req, res) => {
     const options = await generateRegistrationOptions({
       rpName: 'SafeFintech Vault',
       rpID: RP_ID,
-      userID: new TextEncoder().encode(user.id),
+      userID: Buffer.from(user.id),
       userName: user.email,
       attestationType: 'none',
       authenticatorSelection: {
