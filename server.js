@@ -64,7 +64,9 @@ app.post('/api/register-options', async (req, res) => {
       userName: user.email,
       attestationType: 'none',
       authenticatorSelection: {
+        authenticatorAttachment: 'platform',
         residentKey: 'preferred',
+        userVerification: 'required',
         userVerification: 'preferred',
       },
     });
