@@ -64,10 +64,9 @@ app.post('/api/register-options', async (req, res) => {
       userName: user.email,
       attestationType: 'none',
       authenticatorSelection: {
-        authenticatorAttachment: 'platform',
+        authenticatorAttachment: 'platform', // Força o Windows Hello / PIN local
         residentKey: 'preferred',
-        userVerification: 'required',
-        userVerification: 'preferred',
+        userVerification: 'required',        // Exige a verificação (PIN/Biometria)
       },
     });
 
